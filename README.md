@@ -1,6 +1,7 @@
 # PetriSim_Game
 Navigate a petri dish, grow your bacterial colony, and outsmart enemy microbes in this engaging 2D simulation game.
 
+![image](https://github.com/michaelkhany/PetriSim_Game/assets/10214093/5005505e-65c9-4290-872f-fe07d0be1dfc)
 
 Petri Simulator Game 2024 Description
 --------------------------------
