@@ -37,6 +37,9 @@ pygame.display.set_caption("Petri Simulator")
 # Timer
 pygame.time.set_timer(pygame.USEREVENT, SPAWN_FOOD_EVERY)
 
+# Game state variable
+game_state = "start"  # Possible values: "start", "running", "won", "lost"
+
 # Instructions draw setup
 def draw_instructions():
     instructions = [
@@ -49,7 +52,20 @@ def draw_instructions():
         # Adjust the y position based on how many lines of text there are
         screen.blit(text_surface, (5, SCREEN_HEIGHT - (len(instructions) - i) * (font_size + 5)))
 
-
+# Function to draw the start, win, or lose banners
+def draw_banner():
+    if game_state == "start":
+        message = 'To start the game, press "s".'
+    elif game_state == "won":
+        message = 'You won! Press "r" to restart the game.'
+    elif game_state == "lost":
+        message = 'You lost! Press "r" to restart the game.'
+    else:
+        return  # No banner to draw if the game is running
+    
+    text_surface = game_font.render(message, True, text_color)
+    rect = text_surface.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2))
+    screen.blit(text_surface, rect)
 # Bacteria and food setup
 player_bacteria = pygame.Rect(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, BACTERIA_SIZE, BACTERIA_SIZE)
 green_bacteria = []
@@ -95,7 +111,7 @@ def move_bacteria_towards(bacteria, target, speed):
 
 # Check collisions and multiply bacteria
 def check_collisions_and_multiply():
-    global player_bacteria, green_bacteria, red_bacteria, running
+    global player_bacteria, green_bacteria, red_bacteria, game_state
 
     # Player bacteria eats food
     for food in food_list[:]:
@@ -154,62 +170,75 @@ def check_collisions_and_multiply():
         else:
             print("You lose!")
             running = False
+            game_state = "lost"
             return  # Exit the function to avoid further processing
 
     # Win Condition
     if not red_bacteria:
         print("You win!")
         running = False
+        game_state = "won"
 
+# Reset game function
+def reset_game():
+    global player_bacteria, green_bacteria, red_bacteria, food_list, game_state
+    player_bacteria = pygame.Rect(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, BACTERIA_SIZE, BACTERIA_SIZE)
+    green_bacteria = []
+    red_bacteria = [pygame.Rect(random.randint(0, SCREEN_WIDTH - BACTERIA_SIZE), random.randint(0, SCREEN_HEIGHT - BACTERIA_SIZE), BACTERIA_SIZE, BACTERIA_SIZE) for _ in range(5)]
+    food_list = []
+    running = True
+    game_state = "running"
+    
 # Game loop flag
 running = True
-
-while running:
-    # Event handling
+while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.USEREVENT:
+            pygame.quit()
+            sys.exit()
+        elif event.type == pygame.USEREVENT and game_state == "running":
             spawn_food()
 
-    # Key handling for player bacteria movement
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_w]:
-        player_bacteria.y -= MOVE_INCREMENT if player_bacteria.y - MOVE_INCREMENT > 0 else 0
-    if keys[pygame.K_s]:
-        player_bacteria.y += MOVE_INCREMENT if player_bacteria.y + MOVE_INCREMENT + BACTERIA_SIZE < SCREEN_HEIGHT else 0
-    if keys[pygame.K_a]:
-        player_bacteria.x -= MOVE_INCREMENT if player_bacteria.x - MOVE_INCREMENT > 0 else 0
-    if keys[pygame.K_d]:
-        player_bacteria.x += MOVE_INCREMENT if player_bacteria.x + MOVE_INCREMENT + BACTERIA_SIZE < SCREEN_WIDTH else 0
-    if keys[pygame.K_q]:
-        running = False
+    if game_state == "start" and keys[pygame.K_s]:
+        game_state = "running"
+    elif game_state in ["won", "lost"] and keys[pygame.K_r]:
+        reset_game()
 
-    # Move all bacteria
-    move_bacteria()
+    if game_state == "running":
+        # Handle movement and game logic
+        if keys[pygame.K_w]:
+            player_bacteria.y -= MOVE_INCREMENT if player_bacteria.y - MOVE_INCREMENT > 0 else 0
+        if keys[pygame.K_s]:
+            player_bacteria.y += MOVE_INCREMENT if player_bacteria.y + MOVE_INCREMENT + BACTERIA_SIZE < SCREEN_HEIGHT else 0
+        if keys[pygame.K_a]:
+            player_bacteria.x -= MOVE_INCREMENT if player_bacteria.x - MOVE_INCREMENT > 0 else 0
+        if keys[pygame.K_d]:
+            player_bacteria.x += MOVE_INCREMENT if player_bacteria.x + MOVE_INCREMENT + BACTERIA_SIZE < SCREEN_WIDTH else 0
+        if keys[pygame.K_q]:
+            pygame.quit()
+            sys.exit()
 
-    # Check for collisions and handle multiplication
-    check_collisions_and_multiply()
+        move_bacteria()
+        check_collisions_and_multiply()
 
-    # Drawing
     screen.fill(BACKGROUND_COLOR)
-    pygame.draw.rect(screen, BLUE, player_bacteria)  # Draw the player-controlled bacteria
-    for food in food_list:
-        pygame.draw.rect(screen, WHITE, food)  # Draw food
-    for green in green_bacteria:
-        pygame.draw.rect(screen, GREEN, green)  # Draw green bacteria
-    for red in red_bacteria:
-        pygame.draw.rect(screen, RED, red)  # Draw red bacteria
 
-    # Draw instructions
-    draw_instructions()
+    if game_state == "running":
+        pygame.draw.rect(screen, BLUE, player_bacteria)
+        for food in food_list:
+            pygame.draw.rect(screen, WHITE, food)
+        for green in green_bacteria:
+            pygame.draw.rect(screen, GREEN, green)
+        for red in red_bacteria:
+            pygame.draw.rect(screen, RED, red)
+        draw_instructions()
 
-    # Update the display
+    draw_banner()
+
     pygame.display.flip()
-
-    # Control frame rate
     pygame.time.Clock().tick(30)
 
-# Quit the game
+# Outside the game loop, after quitting the game
 pygame.quit()
 sys.exit()
