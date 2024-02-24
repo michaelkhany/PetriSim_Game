@@ -16,7 +16,11 @@ text_color = (0, 0, 0)  # Black color
 
 # Constants
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
-BACKGROUND_COLOR = (255, 182, 193)
+ENVIRONMENT_COLOR = (255, 182, 193)  # The color for the bacteria movement area (The Pertri dish)
+OUTSIDE_COLOR = (128, 128, 128)  # Gray color for the area outside the circle
+BORDER_COLOR = (0, 0, 0)  # Black border color
+CIRCLE_RADIUS = min(SCREEN_WIDTH, SCREEN_HEIGHT) // 2 - 50  # Example radius
+CIRCLE_CENTER = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
 BACTERIA_SIZE = 10
 FOOD_SIZE = 5
 MOVE_INCREMENT = 5
@@ -40,6 +44,14 @@ pygame.time.set_timer(pygame.USEREVENT, SPAWN_FOOD_EVERY)
 
 # Game state variable
 game_state = "start"  # Possible values: "start", "running", "won", "lost"
+
+# Function to draw the environment
+def draw_environment():
+    # Fill background with the outside color
+    screen.fill(OUTSIDE_COLOR)
+    # Draw the circle with the environment color filled and a black border
+    pygame.draw.circle(screen, ENVIRONMENT_COLOR, CIRCLE_CENTER, CIRCLE_RADIUS)
+    pygame.draw.circle(screen, BORDER_COLOR, CIRCLE_CENTER, CIRCLE_RADIUS, 2)  # 2 pixels for border thickness
 
 # Instructions draw setup
 def draw_instructions():
@@ -67,18 +79,41 @@ def draw_banner():
     text_surface = game_font.render(message, True, text_color)
     rect = text_surface.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2))
     screen.blit(text_surface, rect)
+    
 # Bacteria and food setup
+def spawn_bacteria_within_circle():
+    while True:
+        angle = random.uniform(0, 2 * math.pi)
+        radius = random.uniform(0, CIRCLE_RADIUS - BACTERIA_SIZE)
+        x = int(CIRCLE_CENTER[0] + radius * math.cos(angle) - BACTERIA_SIZE / 2)
+        y = int(CIRCLE_CENTER[1] + radius * math.sin(angle) - BACTERIA_SIZE / 2)
+
+        if math.hypot(x + BACTERIA_SIZE / 2 - CIRCLE_CENTER[0], y + BACTERIA_SIZE / 2 - CIRCLE_CENTER[1]) <= CIRCLE_RADIUS - BACTERIA_SIZE:
+            return pygame.Rect(x, y, BACTERIA_SIZE, BACTERIA_SIZE)
+
+# Initialize red bacteria within the circle
+red_bacteria = [spawn_bacteria_within_circle() for _ in range(5)]
+
+# Initialize orange bacteria within the circle
+orange_bacteria = spawn_bacteria_within_circle()
+
 player_bacteria = pygame.Rect(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, BACTERIA_SIZE, BACTERIA_SIZE)
 green_bacteria = []
-red_bacteria = [pygame.Rect(random.randint(0, SCREEN_WIDTH - BACTERIA_SIZE), random.randint(0, SCREEN_HEIGHT - BACTERIA_SIZE), BACTERIA_SIZE, BACTERIA_SIZE) for _ in range(5)]
-orange_bacteria = pygame.Rect(random.randint(0, SCREEN_WIDTH - BACTERIA_SIZE), random.randint(0, SCREEN_HEIGHT - BACTERIA_SIZE), BACTERIA_SIZE, BACTERIA_SIZE)
+
+# Use the new spawning function for red and orange bacteria
+red_bacteria = [spawn_bacteria_within_circle() for _ in range(5)]
+orange_bacteria = spawn_bacteria_within_circle()
+
 food_list = []
 
 # Spawn food function
 def spawn_food():
-    x = random.randint(0, SCREEN_WIDTH - FOOD_SIZE)
-    y = random.randint(0, SCREEN_HEIGHT - FOOD_SIZE)
-    food_list.append(pygame.Rect(x, y, FOOD_SIZE, FOOD_SIZE))
+    while True:
+        x = random.randint(CIRCLE_CENTER[0] - CIRCLE_RADIUS, CIRCLE_CENTER[0] + CIRCLE_RADIUS)
+        y = random.randint(CIRCLE_CENTER[1] - CIRCLE_RADIUS, CIRCLE_CENTER[1] + CIRCLE_RADIUS)
+        if math.hypot(x - CIRCLE_CENTER[0], y - CIRCLE_CENTER[1]) <= CIRCLE_RADIUS - FOOD_SIZE:
+            food_list.append(pygame.Rect(x, y, FOOD_SIZE, FOOD_SIZE))
+            break
 
 # Move bacteria towards nearest food or opposite bacteria
 def move_bacteria():
@@ -115,8 +150,13 @@ def move_bacteria_towards(bacteria, target, speed):
     move_x, move_y = target.centerx - bacteria.centerx, target.centery - bacteria.centery
     norm = math.sqrt(move_x ** 2 + move_y ** 2) if math.sqrt(move_x ** 2 + move_y ** 2) > 0 else 1
     move_x, move_y = move_x / norm, move_y / norm
-    bacteria.x += int(move_x * speed)
-    bacteria.y += int(move_y * speed)
+    new_x = bacteria.x + int(move_x * speed)
+    new_y = bacteria.y + int(move_y * speed)
+    
+    # Check if the new position is within the circle
+    if math.hypot(new_x + BACTERIA_SIZE/2 - CIRCLE_CENTER[0], new_y + BACTERIA_SIZE/2 - CIRCLE_CENTER[1]) <= CIRCLE_RADIUS - BACTERIA_SIZE/2:
+        bacteria.x = new_x
+        bacteria.y = new_y
 
 # Check collisions and multiply bacteria
 def check_collisions_and_multiply():
@@ -198,17 +238,19 @@ def check_collisions_and_multiply():
 
 # Reset game function
 def reset_game():
-    global player_bacteria, green_bacteria, red_bacteria, food_list, game_state
+    global player_bacteria, green_bacteria, red_bacteria, orange_bacteria, food_list, game_state
     player_bacteria = pygame.Rect(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, BACTERIA_SIZE, BACTERIA_SIZE)
     green_bacteria = []
-    red_bacteria = [pygame.Rect(random.randint(0, SCREEN_WIDTH - BACTERIA_SIZE), random.randint(0, SCREEN_HEIGHT - BACTERIA_SIZE), BACTERIA_SIZE, BACTERIA_SIZE) for _ in range(5)]
+    # Use spawn_bacteria_within_circle to initialize red bacteria within the circle
+    red_bacteria = [spawn_bacteria_within_circle() for _ in range(5)]
+    # Use spawn_bacteria_within_circle to initialize orange bacteria within the circle
+    orange_bacteria = spawn_bacteria_within_circle()
     food_list = []
-    running = True
     game_state = "running"
     
 # Game loop flag
 running = True
-while True:
+while True:    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -223,15 +265,23 @@ while True:
         reset_game()
 
     if game_state == "running":
-        # Handle movement and game logic
+        # Handle player movement with boundary checks
         if keys[pygame.K_w]:
-            player_bacteria.y -= MOVE_INCREMENT if player_bacteria.y - MOVE_INCREMENT > 0 else 0
+            new_y = player_bacteria.y - MOVE_INCREMENT
+            if math.hypot(player_bacteria.centerx - CIRCLE_CENTER[0], (new_y + BACTERIA_SIZE/2) - CIRCLE_CENTER[1]) <= CIRCLE_RADIUS - BACTERIA_SIZE/2:
+                player_bacteria.y = max(new_y, CIRCLE_CENTER[1] - CIRCLE_RADIUS + BACTERIA_SIZE/2)
         if keys[pygame.K_s]:
-            player_bacteria.y += MOVE_INCREMENT if player_bacteria.y + MOVE_INCREMENT + BACTERIA_SIZE < SCREEN_HEIGHT else 0
+            new_y = player_bacteria.y + MOVE_INCREMENT
+            if math.hypot(player_bacteria.centerx - CIRCLE_CENTER[0], (new_y + BACTERIA_SIZE/2) - CIRCLE_CENTER[1]) <= CIRCLE_RADIUS - BACTERIA_SIZE/2:
+                player_bacteria.y = min(new_y, CIRCLE_CENTER[1] + CIRCLE_RADIUS - BACTERIA_SIZE * 1.5)
         if keys[pygame.K_a]:
-            player_bacteria.x -= MOVE_INCREMENT if player_bacteria.x - MOVE_INCREMENT > 0 else 0
+            new_x = player_bacteria.x - MOVE_INCREMENT
+            if math.hypot((new_x + BACTERIA_SIZE/2) - CIRCLE_CENTER[0], player_bacteria.centery - CIRCLE_CENTER[1]) <= CIRCLE_RADIUS - BACTERIA_SIZE/2:
+                player_bacteria.x = max(new_x, CIRCLE_CENTER[0] - CIRCLE_RADIUS + BACTERIA_SIZE/2)
         if keys[pygame.K_d]:
-            player_bacteria.x += MOVE_INCREMENT if player_bacteria.x + MOVE_INCREMENT + BACTERIA_SIZE < SCREEN_WIDTH else 0
+            new_x = player_bacteria.x + MOVE_INCREMENT
+            if math.hypot((new_x + BACTERIA_SIZE/2) - CIRCLE_CENTER[0], player_bacteria.centery - CIRCLE_CENTER[1]) <= CIRCLE_RADIUS - BACTERIA_SIZE/2:
+                player_bacteria.x = min(new_x, CIRCLE_CENTER[0] + CIRCLE_RADIUS - BACTERIA_SIZE * 1.5)
         if keys[pygame.K_q]:
             pygame.quit()
             sys.exit()
@@ -239,7 +289,8 @@ while True:
         move_bacteria()
         check_collisions_and_multiply()
 
-    screen.fill(BACKGROUND_COLOR)
+    # Draw the environment instead of filling the background with a single color
+    draw_environment()
 
     if game_state == "running":
         if player_bacteria:  # Add this check to ensure player_bacteria exists
