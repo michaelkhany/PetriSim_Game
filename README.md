@@ -49,6 +49,6 @@ Q: Quit the game
 Win: All red bacteria are eliminated.
 Lose: No controllable bacteria remain.
 
-![screenshot image](https://github.com/michaelkhany/PetriSim_Game/assets/10214093/87bcba5e-e4fb-4b50-9638-39614b1c278b)
+![Screenshot image of game play environment](https://github.com/michaelkhany/PetriSim_Game/assets/10214093/c2cfa329-8874-4b3c-ba69-ece8c47d47aa)
 
 This simulation game provides a unique blend of strategy and action, challenging players to navigate the dangers of the petri dish while managing their own bacterial colony.
